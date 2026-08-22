@@ -4,9 +4,10 @@
 #   termdash finance    -> last N sessions whose (renamed) session name contains "finance"
 #
 # Keys inside the picker:
-#   Enter   = resume the selected session in this terminal
-#   Ctrl-T  = open a new terminal tab and resume there (current window untouched)
-#   Esc     = cancel
+#   Enter     = resume the selected session in this terminal
+#   Ctrl-T    = open a new terminal tab and resume there (current window untouched)
+#   Esc       = cancel
+#   Up/Down   = wraps around (top row + Up jumps to the bottom row, and back)
 #
 # Requirements: fzf, python3, the `claude` CLI, and `bin/termdash-list.py`
 # from this repo on your PATH (the install.sh does that for you).
