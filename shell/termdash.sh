@@ -32,6 +32,7 @@ termdash() {
     --height=~20 \
     --layout=reverse \
     --border \
+    --cycle \
     --expect=ctrl-t \
     --header="Enter=resume here  Ctrl-T=resume in new tab${query:+   [filter: $query]}" \
     --prompt='termdash > ')
