@@ -1,11 +1,18 @@
 # termdash: browse recent Claude Code sessions with fzf
 #
-#   termdash            -> last N sessions across all your Claude Code projects
-#   termdash finance    -> last N sessions whose (renamed) session name contains "finance"
+#   termdash                  -> last N sessions across all your Claude Code projects
+#   termdash finance          -> last N sessions whose (renamed) session name contains "finance"
+#   termdash amazon-brain-2c  -> also matches a running session's peer name (the name
+#                                other sessions see in ListAgents / SendMessage)
+#   termdash 425fa77b         -> also matches the session ID (full or prefix) and the
+#                                claude.ai "session_01..." ID
+#
+# Rows marked ● are running right now. Picking one jumps to the terminal tab it
+# lives in instead of resuming a second copy of the same session.
 #
 # Keys inside the picker:
-#   Enter     = resume the selected session in this terminal
-#   Ctrl-T    = open a new terminal tab and resume there (current window untouched)
+#   Enter     = resume the selected session in this terminal (● = jump to its tab)
+#   Ctrl-T    = open a new terminal tab and resume there (● = jump to its tab)
 #   Esc       = cancel
 #   Up/Down   = wraps around (top row + Up jumps to the bottom row, and back)
 #
@@ -26,7 +33,7 @@ termdash() {
     return 1
   fi
 
-  local result key selected session_id cwd
+  local result key selected session_id cwd session_tty
   result=$(printf '%s\n' "$rows" | fzf \
     --delimiter=$'\t' \
     --with-nth=1 \
@@ -35,7 +42,7 @@ termdash() {
     --border \
     --cycle \
     --expect=ctrl-t \
-    --header="Enter=resume here  Ctrl-T=resume in new tab${query:+   [filter: $query]}" \
+    --header="Enter=resume here  Ctrl-T=resume in new tab  ●=running, jumps to its tab${query:+   [filter: $query]}" \
     --prompt='termdash > ')
 
   [[ -z "$result" ]] && return 1
@@ -46,6 +53,47 @@ termdash() {
 
   session_id=$(printf '%s' "$selected" | awk -F'\t' '{print $2}')
   cwd=$(printf '%s' "$selected" | awk -F'\t' '{print $3}')
+  session_tty=$(printf '%s' "$selected" | awk -F'\t' '{print $4}')
+
+  # Already running in some tab: jump there instead of resuming a second copy
+  if [[ -n "$session_tty" ]]; then
+    local found=""
+    if [[ "$TERM_PROGRAM" == "iTerm.app" ]]; then
+      found=$(osascript -e "tell application \"iTerm2\"
+        repeat with w in windows
+          repeat with t in tabs of w
+            repeat with s in sessions of t
+              if tty of s is \"/dev/$session_tty\" then
+                select w
+                select t
+                select s
+                activate
+                return \"ok\"
+              end if
+            end repeat
+          end repeat
+        end repeat
+      end tell")
+    elif [[ "$TERM_PROGRAM" == "Apple_Terminal" ]]; then
+      found=$(osascript -e "tell application \"Terminal\"
+        repeat with w in windows
+          repeat with t in tabs of w
+            if tty of t is \"/dev/$session_tty\" then
+              set selected of t to true
+              set index of w to 1
+              activate
+              return \"ok\"
+            end if
+          end repeat
+        end repeat
+      end tell")
+    fi
+    if [[ "$found" != "ok" ]]; then
+      echo "termdash: this session is already running on /dev/$session_tty, but its tab couldn't be found (another app, or tmux?) — switch to it manually"
+      return 1
+    fi
+    return 0
+  fi
 
   if [[ "$key" == "ctrl-t" ]]; then
     local esc_cwd esc_id script
